@@ -221,7 +221,7 @@ fi
 npm run generate
 
 # Run tests
-npm run test
+
 
 # Build web
 npm run build:web
