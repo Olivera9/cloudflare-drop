@@ -51,8 +51,13 @@ try {
 } catch (_error) {
   process.exit(0);
 }
+// Wrangler can prefix a namespace with "worker-" when no config exists yet.
+// Prefer the exact name and then reuse the namespace created by an earlier run.
 const namespace = namespaces.find((item) =>
   item.title === namespaceName || item.name === namespaceName
+) || namespaces.find((item) =>
+  item.title === `worker-${namespaceName}` ||
+  item.name === `worker-${namespaceName}`
 );
 const id = namespace?.id || namespace?.namespace_id;
 if (id) console.log(id);
@@ -111,8 +116,15 @@ ensure_kv_namespace() {
   if [ -z "$KV_NAMESPACE_ID" ]; then
     echo "Creating KV namespace: $KV_NAMESPACE_NAME"
     local create_output
-    create_output=$(npx wrangler kv namespace create "$KV_NAMESPACE_NAME")
-    KV_NAMESPACE_ID="$(extract_resource_id <<< "$create_output")"
+    if create_output=$(npx wrangler kv namespace create "$KV_NAMESPACE_NAME"); then
+      KV_NAMESPACE_ID="$(extract_resource_id <<< "$create_output")"
+    fi
+  fi
+
+  # A previous deployment (or concurrent run) may already have created it.
+  # Re-list also handles output formats that do not print the ID on create.
+  if [ -z "$KV_NAMESPACE_ID" ] && list_output=$(npx wrangler kv namespace list); then
+    KV_NAMESPACE_ID="$(find_kv_id "$KV_NAMESPACE_NAME" <<< "$list_output")"
   fi
 
   if [ -z "$KV_NAMESPACE_ID" ]; then
